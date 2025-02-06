@@ -1,0 +1,1 @@
+DD Coil modifiable by Gabryxx on Thingiverse: https://www.thingiverse.com/thing:5966085
