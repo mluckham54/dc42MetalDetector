@@ -14,7 +14,4 @@ The tuning capacitors across the coils should be adjusted such that the LC netwo
 
 The code contains a lot of notes about the discovery process, tuning the coils, understanding how the code works, fixing some issues in the code, and extending it to my liking.
 
-
-
-
-TODO:  wrap the coils in grounded aluminium foil (with a gap at one point so that it doesn't behave like a shorted turn) so that capacitance between the coils and the ground doesn't cause the system to go out of balance.
+Recently wrapped the non-overlapping part of each coil in grounded aluminium foil (with a gap across that part of the coil that overlaps the other coil).  The coils still can be adjusted to balance.  I didn't notice any change in sensitivity during bench testing.
