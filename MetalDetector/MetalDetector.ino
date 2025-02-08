@@ -196,6 +196,9 @@
 #define USE_3V3_AREF  (0)        // set to 1 of running on an Arduino with USB power, 0 for an Atmega28p with no 3.3V supply available
 
 
+// set to (1) so that oscilloscope and this program has same sign for the phase.  The sign can depend on the polarity of the wires connecting the coils to the
+// PCB, or the order of how the RX and TX coils overlap.
+#define NEGATE_PHASE (0)
 
 // WIRING
 //
@@ -957,7 +960,9 @@ void loop()
   // metal passing over the non-overlapping parts of the coils produces a negative phase shift, while in the neutral middle will show positive
   // best sensitivity and range is in the middle when the coil is adjusted for minimum voltage (60 mA or less)
   
-  phaseAverage = -phaseAverage;
+#if NEGATE_PHASE
+    phaseAverage = -phaseAverage;
+#endif
 
   phaseStable = abs(previousPhase - phaseAverage) <= 5.0;      // phase fluctuates wildly especially when the signal voltage is very low
   previousPhase = phaseAverage;
