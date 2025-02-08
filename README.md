@@ -1,5 +1,5 @@
-arduino
-=======
+arduino Libraries
+=================
 
 This repository contains reusable modules, drivers and patches for the Arduino platform. Here is a description of the
 projects:
@@ -38,3 +38,7 @@ RotaryEncoder
 This is a class to read rotary encoders, allowing for contact bounce and variation in the detent position. It can be
 used with or without the task scheduler. To maintain responsiveness, the poll() function must be called at intervals
 of 1ms or 2ms.
+
+MetalDetector
+=============
+A double-D coil metal detector
