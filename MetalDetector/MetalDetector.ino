@@ -1164,7 +1164,7 @@ void loop()
 #endif
 
   // Decide what we have found and tell the user
-  if (ampAverage >= ampThreshold)
+  if (abs(ampAverage) >= ampThreshold)
   {
 #if ENABLE_SOUND
     // detection tone generation copied from ds42
