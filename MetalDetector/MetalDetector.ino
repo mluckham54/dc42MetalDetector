@@ -6,10 +6,14 @@
 // https://github.com/dc42/arduino/blob/master/MetalDetector
 //   (his version has support for battery power measurement and adjustable threshold)
 
+// Tested on an Arudino UNO R3.
+
 // This is a VLF (very low frequency) Induction Balance detector technology and contains two identical coils : transmitter and receiver coil in
 // a double-D arrangement.  As with all induction balance detectors, coil balance is very critical. The potentiometer is used to zero the small
 // 90 degrees out-of-phase component of the signal (the in-phase component is nulled by adjusting the relative placement (overlap) of the coils
 // in typical IB-detector style).
+//
+// I found the potentiometer usefulness to be very limited.
 //
 // Does the 90 degree out-of-phase component arise from the current in the coil lagging the voltage?  The current in the capacitor leads the voltage
 // and is also 90 degrees out-of-phase.  https://eepower.com/technical-articles/understanding-resonance-in-parallel-rlc-circuits/#
@@ -77,11 +81,23 @@
 // The coils as-built were measured using a cheap ESD L/C meter.  The coil w/BL+WH wires was 987.8 uH, w/BLU+YEL wires 1029 uH - agreeing pretty closely
 // to the calculated value of 956 uH.  Measurement was done after the coils were wrapped in tape, making it impossible to adjust the coil's inductance by
 // adding or removing turns - instead, the capacitor values can be adjusted for equal resonance.
-//
+
 // OPTIONALLY screen one or both of the coils using aluminum foil bound with tinned copper wire (taking care to leave a small gap of 1-2 inches along one
 //            part of the coil so that the screen doesn’t behave like a shorted turn).  Ground the shield, and tie-wrap the coils onto a plastic plate.
 //            Some sources say that for audio frequencies, screening the coils makes no difference.  Some screen the transmit coil, some the receive coil,
-//            some both. I did not screen the coils - experiments can come later.
+//            some both.
+//
+//            Comments (https://metaldetectingforum.com/index.php?threads/shielding.84884/, https://qr.ae/pY9dUr) describe how grounded aluminum foil to
+//            make a Faraday cage will protect against electrostatic fields but that magnetic fields are not blocked.
+//
+//            I tried with and without screen - for benchtop testing I didn't notice any difference in detection performance, however noise immunity
+//            did seem to be improved.
+
+// FURTHER EXPERIMENTATION
+// https://www.wombatpi.net/wombat_discrimination.pdf suggests that using time delays can identify specific types of metal.  To experiment would require
+// modifying this program to emit a single pulse and measure the responding echoes.  Measurements at R1 (ratio 1) (21 uSec / 18 uSec), R2 (24 uSec / 18 uSec),
+// R3 (33 uSec / 24 uSec), R4 (33 uSec / 18 uSec) are suggested.  This might require an Uno R4 which has a much faster sampling rate.
+
 
 // DRIVING THE TRANSMIT COIL AT ITS RESONANT FREQUENCY
 //
@@ -327,9 +343,9 @@ const float phaseAdjust = (45.0 * 32.0) / (float)(TIMER1_TOP + 1);
 // TODO: ADJUSTABLE THRESHOLD
 // The user will be able to adjust this via a pot or rotary encoder.
 
-float ampThreshold = 0.1;           // lower = greater sensitivity. 10 is barely usable with a well-balanced coil.
-float posPhaseThreshold = 1.0;      // positive phase shift for ferrous
-float negPhaseThreshold = -10.0;    // negative phase shift for non-ferrous
+float ampThreshold = 0.15;           // lower = greater sensitivity. 10 is barely usable with a well-balanced coil.
+float posPhaseThreshold = 2.0;     // positive phase shift for ferrous
+float negPhaseThreshold = -2.0;    // negative phase shift for non-ferrous
 
 
 
@@ -1162,15 +1178,17 @@ void loop()
     lcd.print((char)223);        // degree symbol
   }
 #endif
-
+  
   // Decide what we have found and tell the user
-  if (abs(ampAverage) >= ampThreshold)
+  // phase detection is observed to be more sensitive than amplitude detection
+  
+  if (abs(amplitude) >= ampThreshold)
   {
 #if ENABLE_SOUND
-    // detection tone generation copied from ds42
      if (calibrated)
      {
-       tone(ampAverage * 10 + 245);
+       // tone is higher with increased amplitude
+       tone(300 + amplitude * 10);
      }
 #endif
        
@@ -1179,7 +1197,7 @@ void loop()
     // Ferrous metals give zero phase shift or a small positive phase shift.
     // So we'll say that anything with a phase shift below -20deg is non-ferrous.
     
-    if (phaseAverage <= negPhaseThreshold)
+    if (displayPhase <= negPhaseThreshold)
     {
 #if PRINT_MATERIAL        
       Serial.print("Non-ferrous");
@@ -1190,9 +1208,8 @@ void loop()
       lcd.setCursor(0,0);
       lcd.print("nonFER");
 #endif
-      
     }
-    else if (phaseAverage >= posPhaseThreshold)
+    else if (displayPhase >= posPhaseThreshold)
     {
 #if PRINT_MATERIAL        
       Serial.print("Ferrous");
@@ -1207,18 +1224,35 @@ void loop()
 
 #if PRINT_BARS
     // graphical display of amount over the threshold
-    float temp = ampAverage;
-    while (temp > ampThreshold)
+    float temp = amplitude;
+    while (temp > amplitude)
     {
       Serial.write('!');
-      temp -= (ampThreshold/2);
+      temp -= (amplitude/2);
     }
 #endif
   }
 
+  else if (phaseStable)
+  {
+#if ENABLE_SOUND
+    if (displayPhase >= posPhaseThreshold)
+    {
+      tone(1800);
+    }
+    else if (displayPhase <= negPhaseThreshold)
+    {
+      tone(800);
+    }
+    else
+    {
+      tone(0);
+    }
+#endif
+  }
   else
   {
-     tone(0);
+    tone(0);
   }
 
   Serial.println();
