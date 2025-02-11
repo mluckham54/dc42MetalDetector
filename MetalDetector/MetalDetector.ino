@@ -94,9 +94,9 @@
 //            did seem to be improved.
 
 // FURTHER EXPERIMENTATION
-// https://www.wombatpi.net/wombat_discrimination.pdf suggests that using time delays can identify specific types of metal.  To experiment would require
-// modifying this program to emit a single pulse and measure the responding echoes.  Measurements at R1 (ratio 1) (21 uSec / 18 uSec), R2 (24 uSec / 18 uSec),
-// R3 (33 uSec / 24 uSec), R4 (33 uSec / 18 uSec) are suggested.  This might require an Uno R4 which has a much faster sampling rate.
+// https://www.wombatpi.net/wombat_discrimination.pdf suggests that using time delays can identify specific types of metal - I think by examining the shape
+// of the echo response.  Measurements at R1 (ratio 1) (21 uSec / 18 uSec), R2 (24 uSec / 18 uSec), R3 (33 uSec / 24 uSec), R4 (33 uSec / 18 uSec) are suggested.
+// This might require an Uno R4 which has a much faster sampling rate.  Note that at 8 kHz, one cycle is 125 usec so each of the 8 samples is 15.625 usec apart.
 
 
 // DRIVING THE TRANSMIT COIL AT ITS RESONANT FREQUENCY
