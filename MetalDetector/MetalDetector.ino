@@ -29,11 +29,12 @@
 #define PRINT_TICKS (0)
 #define PRINT_ISR_VARS (0)
 #define PRINT_ADC_MINMAX (0)
-#define PRINT_VOLTS (1)
+#define PRINT_VOLTS (0)
 #define PRINT_FFT (0)
-#define PRINT_AMPLITUDE (1)
-#define PRINT_PHASE (1)
+#define PRINT_AMPLITUDE (0)
+#define PRINT_PHASE (0)
 #define PRINT_AVERAGES (0)
+#define PRINT_AVERAGES_B (1)
 #define PRINT_READINGS (0)
 #define PRINT_MATERIAL (0)
 #define PRINT_BARS (0)
@@ -744,10 +745,11 @@ void tone(unsigned int freq)
 // 1. It clears the timer 0 overflow flag. If we don't do this, the ADC will not see any more Timer 0 overflows and we will not get any more conversions.
 // 2. It increments the tick counter, allowing is to do timekeeping. We get 62500 ticks/second, depending on the Timer1 frequency that was configured.
 //
-// We now read the ADC in the timer interrupt routine instead of having a separate conversion complete interrupt.  (?? is ADC-completion checked, or is
-//   Timer1 running so slowly that the 14-cycle ADC conversion is always completed when the interrupt occurs ??)
+// We now read the ADC in the timer interrupt routine instead of having a separate conversion complete interrupt.  The ADC-completion register is not checked,
+// the assumption is that Timer1 runs so slowly that the 14-cycle ADC conversion is always completed when the interrupt occurs.  Conversely, care has to be taken
+// not to remain in the ISR itself with interrupts off - otherwise an ADC-completion interrupt can be missed .. in such case an ADC value of zero is obtained.
 //
-// The ADC value is added to the corresponding phase bin, value is capped at +/-15000  (max signed integer value +/-32767)
+// The ADC value is added to the corresponding phase bin.  If integration (adding across multiple PWM cycles) is used, the value is capped at +/-15000.
 //
 //   Timer0 square wave is 1/8 the frequency of Timer1 interrupt rate.  So Timer1 interrupts 8 times during one complete Timer0 cycle (one 50% duty cycle square wave sent to the TX coil).
 //   The TX cycle is divided into 8 intervals .. for half of them the output is HIGH and the second have is LOW.  The TX coil LC network response time converts the square wave to a sin
@@ -756,10 +758,12 @@ void tone(unsigned int freq)
 //   for objects smaller or farther away.
 //
 //   At the end of each of the 8 intervals the amplified signal from the RX coil is read and converted by the ADC.  The first four intervals represent the first half of the output square
-//   wave duty cycle and the second four intervals the second half.  During the first cycle the amplitude is expected to be positive, during the second negative.  The maximum amplitude and
-//   the the phase shift relative to the output square wave are determined in this ISR.
+//   wave duty cycle (when sine wave voltage is building up to max 5V) and the second four intervals the second half (when sine wave voltage is decaying from max 5V back to 0V).
+//   During the first cycle the amplitude is expected to be positive, during the second negative.  The maximum amplitude and the the phase shift relative to the output square wave are determined in this ISR.
 //
-// If Timer0 has the value 7 (every 8th count?) and the number of samples acquired has reached the number-to-average amount, the phase bin values are copied
+//      ?? The most stable part of the PWM cycle is thus in the middle where the 5V is near maximum ??
+//
+// If Timer0 has the value 7 (every 8th count) and the number of samples acquired has reached the number-to-average amount, the phase bin values are copied
 // to the averages array, bins are zeroed, and sampleReady is set to true.
 //
 // A race condition between the main code that reads the averages array, and the ISR, is managed using the sampleReady flag .. averages[] is not loaded unless
@@ -790,8 +794,9 @@ ISR(TIMER1_OVF_vect)
   int16_t valZeroCorrected = (zeroValue - val);
   rawbins[ctr] = valZeroCorrected;                // zero-corrected ADC reading
 
-  // pointers to value storage
-  int16_t *p = &bins[ctr & 3];             // bitwise AND providing an index 0..3  - for the four 45-degree samples
+
+  const int16_t samplestartctr = 4;          // 0 first first half of cycle (0-3), 4 for second half (4-7), 2 for middle (2-5)
+  const int16_t samplestopctr = samplestartctr + 3;
 
 /*
   if (ctr < 4)
@@ -811,10 +816,12 @@ ISR(TIMER1_OVF_vect)
     if (*p < -15000) *p = -15000;          // sets a minimum on the accumulated value
   }
 */
-
+  
   // only collecting the second half of the cycle - ADC readings more closely reflect the waveform
-  if (ctr >= 4)
+  if (ctr >= samplestartctr && ctr <= samplestopctr)
   {
+    int16_t *p = &bins[(ctr - samplestartctr) & 3];
+  
 #if USE_INTEGRATION
     // integration technique (amplifies the signal by adding contribution from numerous samples)
     *p += valZeroCorrected;               // zero-corrected averaged ADC value
@@ -926,7 +933,8 @@ void loop()
   //     - 2nd harmonic tends to lower the sin peak at 90 and 270 deg
   //     - 3rd harmonic tends to lower the right half the peak between 90-180
 
-  // averages[0..3] contains the net difference at a certain phase angle of the first half of a TX (transmitted) clock cycle, minus the same phase angle of the second half of the clock cycle.
+  // (ORIGINAL CODE) averages[0..3] contains the net difference at a certain phase angle of the first half of a TX (transmitted) clock cycle, minus the same phase angle of the second half of the clock cycle.
+  // (THIS CODE)     averages[0..3] contains the ADC readings for 4 of the 8 samples each cycle.
   //   The RX (received) signal will track the TX signal at a lesser amplitude and with a phase shift.
   
   // Compute the amplitude and the amount of phase shift - using FOURIER ANALYSIS.
@@ -1097,6 +1105,14 @@ void loop()
     Serial.println(averages[i]);   // one value per line for the Serial Plotter
   }
   Serial.write(' ');
+#endif
+
+#if PRINT_AVERAGES_B
+  for (int i=0;i<4; i++)
+  {
+    Serial.print(averages[i]);   // one value per line for the Serial Plotter
+    Serial.write(' ');
+  }
 #endif
 
 #if PRINT_READINGS
