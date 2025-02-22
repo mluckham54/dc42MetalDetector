@@ -7,6 +7,7 @@
 //   (his version has support for battery power measurement and adjustable threshold)
 
 // Tested on an Arudino UNO R3.
+// Schematic and PCB designed in KiCad 8.0 for Arduino Nano (MetalDetector-Mirko-Mike)
 
 // This is a VLF (very low frequency) Induction Balance detector technology and contains two identical coils : transmitter and receiver coil in
 // a double-D arrangement.  As with all induction balance detectors, coil balance is very critical. The potentiometer is used to zero the small
@@ -17,6 +18,11 @@
 //
 // Does the 90 degree out-of-phase component arise from the current in the coil lagging the voltage?  The current in the capacitor leads the voltage
 // and is also 90 degrees out-of-phase.  https://eepower.com/technical-articles/understanding-resonance-in-parallel-rlc-circuits/#
+
+// Future work:
+//    FFT frequency analysis on a longer timeframe (eg: 1024 samples not just 8)
+//    https://www.instructables.com/1024-Samples-FFT-Spectrum-Using-an-Atmega1284/
+//    Refer also to https://www.minelab.com/__files/f/11043/KBA_METAL_DETECTOR_BASICS_&_THEORY.pdf
 
 
 
@@ -34,7 +40,7 @@
 #define PRINT_AMPLITUDE (0)
 #define PRINT_PHASE (0)
 #define PRINT_AVERAGES (0)
-#define PRINT_AVERAGES_B (1)
+#define PRINT_AVERAGES_B (0)
 #define PRINT_READINGS (0)
 #define PRINT_MATERIAL (0)
 #define PRINT_BARS (0)
@@ -190,10 +196,19 @@
 //   This allows time for 16 ADC clock cycles for each ADC conversion (it actually takes 13.5 cycles), and we take 8 samples per cycle of the coil drive voltage.
 //   The ADC implements four phase-sensitive detectors at 45 degree intervals. Using 4 instead of just 2 allows us to cancel the third harmonic of the
 //   coil frequency.
+//
 //      WHY MENTION THE 3RD HARMONIC?  7.8125, 15.625, 23.4375, 31.25kHz
 //      https://powerquality.blog/2023/09/08/effect-of-harmonics-on-power-transformers-a-practical-demonstration-and-analysis/
 //         2nd harmonic lowers the second half of each half-phase
 //         3rd harmonic lowers the peak of each half-phase
+//
+//   Using Rigol DS1052E scope in FFT mode, the coil adjusted for minimum voltage (50mV), and scope probes on A1 (RX input from the OPAMP) and D5 (PWM output to the TX coil)
+//   the 8.0 Khz fundamental peak is observed 23dB above the noise and the first harmonic at 17 KHz about 16dB above the noise.  At the very end of the FFT trace at 24kHz there
+//   might be the 3rd harmonic but it's hard to know how valid the 8dB reading is.  At the beginning of the FFT trace near 100 Hz is a rise, probably to 60Hz.  No other peaks
+//   were observed.
+//
+//   With a metal target about 12cm away, the peaks remain at same places although stronger.  Looking at the waveform with the metal target in place and digital filter ON, the
+//   sine wave peaks are rounded although tilt-distorted to the left a bit.  There is no 'dip' in the centre of the peaks as might be expected if the 2nd harmonic was depressing it.
 //
 //   Timer 2 is used to generate a tone for the earpiece or headset.
 
@@ -305,10 +320,10 @@ const uint16_t maxIntegrationAmount = 15000;     // amplification truncated abov
 const int16_t zeroValue = 126;       // usually 127 or 128 but need also to tune the 100K voltage divider feeding into the OPAMP
 
 // Variables used by the ISR and outside it
-volatile int16_t averages[4];    // when we've accumulated enough readings in the bins, the ISR copies them to here and starts again
+volatile int16_t averages[4];    // values copied by the ISR from bins[], for the loop() to use
 volatile int16_t rawbins[8];     // ADC readings accumulated in the ISR
 
-volatile int16_t readings[8];    // ADC readings that go into making averages
+volatile int16_t readings[8];    // values copied by the ISR from rawbins, for the loop() to use
 volatile int16_t readingsMin;    // minimum ADC value read during a cycle
 volatile int16_t readingsMax;    // maximum ADC value read during a cycle .. use to determine the voltage midpoint (127 or 128?)
 volatile int16_t readingsMisses;
@@ -344,9 +359,9 @@ const float phaseAdjust = (45.0 * 32.0) / (float)(TIMER1_TOP + 1);
 // TODO: ADJUSTABLE THRESHOLD
 // The user will be able to adjust this via a pot or rotary encoder.
 
-float ampThreshold = 0.15;           // lower = greater sensitivity. 10 is barely usable with a well-balanced coil.
-float posPhaseThreshold = 2.0;     // positive phase shift for ferrous
-float negPhaseThreshold = -2.0;    // negative phase shift for non-ferrous
+const float ampThreshold = 0.15;           // lower = greater sensitivity. 10 is barely usable with a well-balanced coil.
+const float posPhaseThreshold = 2.0;     // positive phase shift for ferrous
+const float negPhaseThreshold = -2.0;    // negative phase shift for non-ferrous
 
 
 
@@ -707,7 +722,7 @@ void setup()
 
 
   Serial.begin(115200);
-//  Serial.println("Discarding first sample");
+  //Serial.println(F("Discarding first sample"));
 
     while (!sampleReady) {}    // discard the first sample collected by the ISR
 
@@ -882,9 +897,9 @@ void loop()
     // Calibration can be repeated as often as needed.
     
     lcd.setCursor(0,0);
-    lcd.print("Calibrating...  ");
+    lcd.print(F("Calibrating...  "));
 
-    Serial.print("Calibrating");
+    Serial.print(F("Calibrating"));
 
     calibratedVolts = 0;
     calibratedPhase = 0;
@@ -897,20 +912,20 @@ void loop()
       
       while (!sampleReady) {}
       
-      Serial.print('.');
+      Serial.print(F("."));
     }
 
     calibrated = true;
 
     // erase "Calibrating...  "
     lcd.setCursor(0,0);
-    lcd.print("                ");
+    lcd.print(F("                "));
 
     sampleReady = false;
     sampleReadyLatency = ticks - sampleReadyTicks;
     sampleReadyTicks = 0;
 
-    Serial.print("done: ");
+    Serial.print(F("done: "));
 
     Serial.println(calibratedVolts);
 
@@ -1008,93 +1023,93 @@ void loop()
   {
     digitalWrite(blinkPin, HIGH);  // turn on the overflow LED ('L' on the Arduino board)
   }
-  
+
   // ***** NO CALCULATIONS BELOW HERE - ONLY OUTPUTS *****
 
 
 #if PRINT_TICKS    
   Serial.print(ticks);    // current ISR clock tick - theoretically 8192 but actually 8000-8039 per sample
-  Serial.write(' ');
+  Serial.write(F(" "));
 #endif
 
 #if PRINT_ISR_VARS
   Serial.print(sampleReadyLatency);
-  Serial.write(' ');
+  Serial.write(F(" "));
   Serial.print(readingsMisses);
-  Serial.print('/');
+  Serial.print(F('/'));
   Serial.print(samplesToAccumulate);
-  Serial.write(' ');
+  Serial.write(F(" "));
 #endif
 
 #if PRINT_ADC_MINMAX
   Serial.print(readingsMin);
-  Serial.write(' ');
+  Serial.write(F(" "));
   Serial.print(readingsMax);
-  Serial.write(' ');
+  Serial.write(F(" "));
 #endif
 
 #if PRINT_VOLTS
   Serial.print(volts, 3);
-  Serial.write(' ');
+  Serial.write(F(" "));
 #endif
 
 #if PRINT_FFT
   // fourier series
-  if (f0real >= 0.0) Serial.write(' ');  // prints a space where the minus sign would be
+  if (f0real >= 0.0) Serial.write(F(" "));  // prints a space where the minus sign would be
   Serial.print(f0real, 2);
-  Serial.write(' ');
+  Serial.write(F(" "));
   
-  if (f0cmpl >= 0.0) Serial.write(' ');
+  if (f0cmpl >= 0.0) Serial.write(F(" "));
   Serial.print(f0cmpl, 2);
-  Serial.write(' ');
+  Serial.write(F(" "));
   
-  if (f1real >= 0.0) Serial.write(' ');
+  if (f1real >= 0.0) Serial.write(F(" "));
   Serial.print(f1real, 2);
-  Serial.write(' ');
+  Serial.write(F(" "));
   
-  if (f1cmpl >= 0.0) Serial.write(' ');
+  if (f1cmpl >= 0.0) Serial.write(F(" "));
   Serial.print(f1cmpl, 2);
-  Serial.write(' ');
+  Serial.write(F(" "));
 
   // fourier magnitudes
   Serial.print(amp1, 2);
-  Serial.write(' ');
+  Serial.write(F(" "));
   
   Serial.print(amp2, 2);
-  Serial.write(' ');
+  Serial.write(F(" "));
 
-  if (phase1 >= 0.0) Serial.write(' ');
+  if (phase1 >= 0.0) Serial.write(F(" "));
   Serial.print(phase1, 2);
-  Serial.write(' ');
+  Serial.write(F(" "));
   
-  if (phase2 >= 0.0) Serial.write(' ');
+  if (phase2 >= 0.0) Serial.write(F(" "));
   Serial.print(phase2, 2);
-  Serial.print("    ");
+  Serial.print(F("    "));
 #endif
 
 #if PRINT_AMPLITUDE
   // waveform amplitude after integration
-  if (ampAverage >= 0.0) Serial.write(' ');
+  if (ampAverage >= 0.0) Serial.write(F(" "));
   Serial.print(ampAverage, 2);
 
   // volts amplitude
-  if (voltsAmplitude >= 0.0) Serial.write(' ');
+  if (voltsAmplitude >= 0.0) Serial.write(F(" "));
   Serial.print(voltsAmplitude, 2);
-  Serial.write(' ');
+  Serial.write(F(" "));
 #endif
 
 #if PRINT_PHASE
-  if (phaseAverage >= 0.0) Serial.write(' ');
+  if (phaseAverage >= 0.0) Serial.write(F(" "));
   Serial.print(phaseAverage, 0);
-  Serial.write(' ');
+  Serial.write(F(" "));
 
   Serial.print(displayPhase, 0);
-  Serial.write(' ');
+  Serial.write(F(" "));
 
   if (!phaseStable)
   {
-    Serial.print("unstable");
-    Serial.write(' ');
+    Serial.print(F("unstable"));
+    Serial.write(F(" "));
   }
 #endif
 
@@ -1104,14 +1119,14 @@ void loop()
   {
     Serial.println(averages[i]);   // one value per line for the Serial Plotter
   }
-  Serial.write(' ');
+  Serial.write(F(" "));
 #endif
 
 #if PRINT_AVERAGES_B
   for (int i=0;i<4; i++)
   {
     Serial.print(averages[i]);   // one value per line for the Serial Plotter
-    Serial.write(' ');
+    Serial.print(F(" "));
   }
 #endif
 
@@ -1121,7 +1136,7 @@ void loop()
   {
     Serial.println(readings[i]);
   }
-  Serial.write(' ');
+  Serial.write(F(" "));
 #endif
 
   ticks = 0;
@@ -1129,16 +1144,16 @@ void loop()
 #if DISPLAY_VOLTS 
   // adjust D-coil overlap for minimum voltage - 40 mV (0.040) is achievable with care.  Then CALIBRATE.
   lcd.setCursor(0,1);
-  lcd.print("V");
+  lcd.print(F("V"));
   lcd.print(volts, 2);
 #endif
 
 #if DISPLAY_AMPLITUDE
   lcd.setCursor(10,0);
-  lcd.print("      ");
+  lcd.print(F("      "));
   
   lcd.setCursor(10,0);
-  lcd.print("A");
+  lcd.print(F("A"));
   
   // amplitude using the ISR averaging method is extremely small or zero - use volts instead of ampAverage
   // if using integration in the ISR to amplify the signal - ampAverage can be used
@@ -1153,15 +1168,15 @@ void loop()
     
   if (amplitude >= 100)
   {
-    lcd.print(" ");
+    lcd.print(F(" "));
   }
   else if (amplitude >= 10)
   {
-    lcd.print("  ");
+    lcd.print(F("  "));
   }
   else
   {
-    lcd.print("   ");
+    lcd.print(F("   "));
   }
 
   lcd.print(amplitude, 0);
@@ -1173,22 +1188,25 @@ void loop()
 
 #if DISPLAY_PHASE
   lcd.setCursor(10,1);
-  lcd.print("      ");
+  lcd.print(F("      "));
 
   lcd.setCursor(10,1);
-  lcd.print("P");
+  lcd.print(F("P"));
   
   if (phaseStable)
   {
-    if (displayPhase >= 0.0) lcd.print(' ');    // otherwise there's a minus sign
+    if (displayPhase >= 0.0)
+    {
+      lcd.print(F(" "));    // otherwise there's a minus sign
+    }
   
     // right-justify the number
     if (abs(displayPhase) < 100)
-      lcd.print(' ');
+      lcd.print(F(" "));
     else if (abs(displayPhase) < 10)
-      lcd.print(' ');
+      lcd.print(F(" "));
     else if (abs(displayPhase) < 1)
-      lcd.print(' ');
+      lcd.print(F(" "));
     
     lcd.print(displayPhase, 0);
     lcd.print((char)223);        // degree symbol
@@ -1216,25 +1234,25 @@ void loop()
     if (displayPhase <= negPhaseThreshold)
     {
 #if PRINT_MATERIAL        
-      Serial.print("Non-ferrous");
-      Serial.write(' ');
+      Serial.print(F("Non-ferrous"));
+      Serial.write(F(" "));
 #endif
 
 #if DISPLAY_MATERIAL
       lcd.setCursor(0,0);
-      lcd.print("nonFER");
+      lcd.print(F("nonFER"));
 #endif
     }
     else if (displayPhase >= posPhaseThreshold)
     {
 #if PRINT_MATERIAL        
-      Serial.print("Ferrous");
-      Serial.write(' ');
+      Serial.print(F("Ferrous"));
+      Serial.write(F(" "));
 #endif
 
 #if DISPLAY_MATERIAL
       lcd.setCursor(0,0);
-      lcd.print("FER");
+      lcd.print(F("FER"));
 #endif
     }
 
@@ -1243,7 +1261,7 @@ void loop()
     float temp = amplitude;
     while (temp > amplitude)
     {
-      Serial.write('!');
+      Serial.write(F("!"));
       temp -= (amplitude/2);
     }
 #endif
