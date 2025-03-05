@@ -6,6 +6,22 @@
 // https://github.com/dc42/arduino/blob/master/MetalDetector
 //   (his version has support for battery power measurement and adjustable threshold)
 
+// Video on parallel resonant circuits, including the resistor in our schematic which is in series with the TX coil
+// https://www.youtube.com/@ElectronicswithProfessorFiore/videos has a video "AC Electrical Circuit Analysis: Parallel Resonance Introduction"
+// and "AC Electrical Circuit Analysis: Parallel Resonance Example" https://www.youtube.com/watch?v=ynl0dHF74Xc.
+// ?? The example illustrates that the LC network provides a band-pass filter but that the 100ohm resistor times the current from
+// the pin provides the voltage multiplying effect???
+
+// https://www.accelinstruments.com/Magnetic/Magnetic-field-calculator.html
+// Formula for the magnetic field at the center of a circular air coil:
+//  B = (μ₀, N, I) / (2, and r).
+// where: 
+//  B is the magnetic field strength
+//  μ₀ is the permeability of free space
+//  N is the number of turns in the coil
+//  I is the current flowing through the coil
+//  r is the radius of the coil
+
 // Tested on an Arudino UNO R3.
 // Schematic and PCB designed in KiCad 8.0 for Arduino Nano (MetalDetector-Mirko-Mike)
 
@@ -225,7 +241,9 @@
 //                           max current limit R=E/I    40mA: R=5/0.04=125ohm   R=3.3/0.04=82.5ohm   20mA: R=5/0.02=250ohm   R=3.3/0.02=165ohm
 
 // (0) results in a higher voltage received from the receive-coil (2.54V P2P)
-#define USE_3V3_AREF  (0)        // set to 1 of running on an Arduino with USB power, 0 for an Atmega28p with no 3.3V supply available
+#define USE_3V3_AREF  (1)        // set to 1 when the AREF pin is connected to 3.3V.
+                                 // Circuit noise is minimized if using a battery rather than USB supply.  <20mV vs 45mV
+                                 // On an UNO with (1) I was able to achieve V0.01 with the best-tuned coil overlap, but with (0) the best was V0.03
 
 
 // set to (1) so that oscilloscope and this program has same sign for the phase.  The sign can depend on the polarity of the wires connecting the coils to the
@@ -359,7 +377,7 @@ const float phaseAdjust = (45.0 * 32.0) / (float)(TIMER1_TOP + 1);
 // TODO: ADJUSTABLE THRESHOLD
 // The user will be able to adjust this via a pot or rotary encoder.
 
-const float ampThreshold = 0.15;           // lower = greater sensitivity. 10 is barely usable with a well-balanced coil.
+const float ampThreshold = 0.25;           // lower = greater sensitivity. 10 is barely usable with a well-balanced coil.
 const float posPhaseThreshold = 2.0;     // positive phase shift for ferrous
 const float negPhaseThreshold = -2.0;    // negative phase shift for non-ferrous
 
@@ -584,7 +602,7 @@ const unsigned char CLEAR_0C0A_ON_COMPARE_MATCH = (1 << WGM02);
 void setup()
 {
   // pin used for ISR debugging
-
+  
   pinMode(blinkPin, OUTPUT);
   digitalWrite(blinkPin, LOW);   // OFF
 
@@ -596,7 +614,7 @@ void setup()
     // begin() failed so blink error code using the onboard LED if possible
     hd44780::fatalError(status); // does not return
   }
-
+  
   //lcd.backlight();
   lcd.display();
 
@@ -722,7 +740,10 @@ void setup()
 
 
   Serial.begin(115200);
-  //Serial.println(F("Discarding first sample"));
+  // Serial.println(F("Discarding first sample"));
+
+ //tone(80);
+
 
     while (!sampleReady) {}    // discard the first sample collected by the ISR
 
@@ -881,6 +902,7 @@ ISR(TIMER1_OVF_vect)
 void loop()
 {
   digitalWrite(blinkPin, LOW);   // OFF
+
 
   // a new sample in averages[] will be available approximately once/second .. 8192 ticks
   // NOTE one sampleReady interval is already 1 second or about 8000 samples!
