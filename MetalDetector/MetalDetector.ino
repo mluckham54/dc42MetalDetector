@@ -87,12 +87,52 @@
 //       ≈ 10⁶ ÷ (6.283 × √15204.495) ≈ 10⁶ ÷ (6.283 × 123.307)
 //       Resonant Frequency ≈ 1000000 ÷ 774.758 = 1290.726 kilocycles/sec
 //       Conductor Length = 3.141 × 0.160 Metres × 55 Turns = 27.646 Metres
-//
+
 // For the coil-capacitor L-C circuit: https://www.redcrab-software.com/en/Calculator/Electrics/RCL-Parallel-Resonance-Circuit
 //     15.5 cm coil Inductor L  956.938 µH Capacitor C 470 nF Resistor R 1000 Ω Voltage U 5.5 V Decimal places 2   
 //                  Resonance Frequency f0 7.5 kHz Total current I0 5.5 mA Currents IL, IC 121.89 mA
 //                  Impedance XL/XC 45.12 Ω Q factor 22.16 Damping d 0.05 Bandwidth b 338.63 Hz Upper cut-off fH 7.67 kHz Lower cut-off fL 7.34 kHz
 //
+//
+// ALTERNATE COILS
+//
+// (10 turns 24ga 15.5x.5cm) - may require MOSFET or transistor drive due to 50mA total current
+//   10⁶ ÷ ((2 × 3.142 ) × √(31.634 µH × 14.880 pF))
+//   ≈ 10⁶ ÷ (6.283 × √470.714) ≈ 10⁶ ÷ (6.283 × 21.696)
+//   Resonant Frequency ≈ 1000000 ÷ 136.320 = 7335.701 kilocycles/sec
+//   Conductor Length = 3.141 × 0.155 Metres × 10 Turns = 4.869 Metres
+//
+//   Resistance 0.164 x (4.869 x 3.28084) = 2.62 Ω
+//
+//   Inductor 31.634µH Capacitor 12.6µF Resistor 100Ω Voltage 5V
+//   Resonant Frequency 7.97 kHz Total current 50 mA Currents IL,IC 3.16 A, Impedance XL/XC 1.58 Ω
+//   Q factor 63.11 Damping 0.02 Bandwidth 126.31 Hz Upper cut-off 8.03 kHz Lower cut-off 7.91 kHz
+
+// (20 turns 24ga 15.5cm x .5cm) - may require MOSFET or transistor drive due to 50mA total current
+//   10⁶ ÷ ((2 × 3.142 ) × √(126.537 µH × 14.880 pF))
+//   ≈ 10⁶ ÷ (6.283 × √1882.871) ≈ 10⁶ ÷ (6.283 × 43.392)
+//   Resonant Frequency ≈ 1000000 ÷ 272.640 = 3667.836 kilocycles/sec
+//   Conductor Length = 3.141 × 0.155 Metres × 20 Turns = 9.739 Metres
+//
+//   Resistance 0.164 x (9.739 x 3.28084) = 5.3 Ω
+//
+//   Inductor	126.537µH Capacitor 3.15µF Resistor 100Ω Voltage 5V
+//   Resonance frequency 7.97 kHz Total current 50 mA Currents IL,IC 788.89 mA Impedance XL/XC	6.34 Ω   [788.89/121.89 = 5.47 times higher than 55T coil]
+//   Q factor	15.78 Damping	0.06 Bandwidth 505.25 Hz Upper cut-off 8.22 kHz Lower cut-off 7.72 kHz
+//
+// (100 turns 28ga 15.5cm x .5cm) - not suitable
+//   10⁶ ÷ ((2 × 3.142 ) × √(3163.432 µH × 14.880 pF))
+//   ≈ 10⁶ ÷ (6.283 × √47071.868) ≈ 10⁶ ÷ (6.283 × 216.961)
+//   Resonant Frequency ≈ 1000000 ÷ 1363.203 = 733.566 kilocycles/sec
+//   Conductor Length = 3.141 × 0.155 Metres × 100 Turns = 48.695 Metres
+//
+//   Resistance 0.421 x (9.739 x 3.28084) = 13.5 Ω
+//
+//   Inductor 3163.432µH  Capacitor 126nF Resistor 100Ω Voltage 5V
+//   Resonance Frequency 7.97 kHz Total current 50 mA Currents IL,IC 31.56 mA Impedance XL/XC 158.45 Ω
+//   Q factor 0.63 Damping 1.58 Bandwidth 12.63 kHz Upper cut-off 14.29 kHz Lower cut-off 1.66 kHz
+
+
 // A plastic plate was 3D printed from https://www.thingiverse.com/thing:5966085 (DD Coil Modifiable), enlarged to 105%.  The plate is in two parts,
 // one for transmit and the other for receive coil.  The plates can slide together to form an overlap of the D-coils and fixed in place.  When
 // installed on the plates, each coil (now D-shaped) is about 20.5 x 13 cm.
